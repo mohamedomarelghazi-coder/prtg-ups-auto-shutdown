@@ -1,1 +1,3 @@
+# Install with: sudo visudo -f /etc/sudoers.d/prtgups
+# Validate with: sudo visudo -c   and   sudo -l -U prtgups
 prtgups ALL=(root) NOPASSWD: /usr/bin/docker stop app_rh db_finance cache_it, /usr/sbin/shutdown -h +2 *, /usr/sbin/shutdown -c, /usr/bin/wall ""

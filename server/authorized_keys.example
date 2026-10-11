@@ -1,1 +1,3 @@
+# /home/prtgups/.ssh/authorized_keys  (mode 600, owner prtgups)
+# One single line. The key below is a FAKE placeholder.
 command="/usr/local/bin/ups-action.sh",restrict ssh-rsa AAAA...FAKE-KEY-REPLACE-ME... prtg
