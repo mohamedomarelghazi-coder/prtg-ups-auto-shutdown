@@ -1,1 +1,1 @@
-
+command="/usr/local/bin/ups-action.sh",restrict ssh-rsa AAAA...FAKE-KEY-REPLACE-ME... prtg
