@@ -1,1 +1,1 @@
-
+prtgups ALL=(root) NOPASSWD: /usr/bin/docker stop app_rh db_finance cache_it, /usr/sbin/shutdown -h +2 *, /usr/sbin/shutdown -c, /usr/bin/wall ""
