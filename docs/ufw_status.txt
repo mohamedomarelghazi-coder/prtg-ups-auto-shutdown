@@ -1,1 +1,16 @@
+adminnet@gateway-server:~$ sudo ufw status verbose
+Status: active
+Logging: on (low)
+Default: deny (incoming), allow (outgoing), deny (routed)
+New profiles: skip
 
+To                         Action      From
+--                         ------      ----
+22/tcp                     ALLOW IN    Anywhere
+22/tcp (OpenSSH)           ALLOW IN    Anywhere
+514/udp                    ALLOW IN    Anywhere
+161/udp                    ALLOW IN    Anywhere
+22/tcp (v6)                ALLOW IN    Anywhere (v6)
+22/tcp (OpenSSH (v6))      ALLOW IN    Anywhere (v6)
+514/udp (v6)               ALLOW IN    Anywhere (v6)
+161/udp (v6)               ALLOW IN    Anywhere (v6)
