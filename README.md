@@ -4,7 +4,7 @@ Reactive monitoring lab: a simulated UPS sends SNMP Traps to **PRTG**, which rea
 
 > **Note:** there is no physical UPS. The UPS is simulated by a Linux VM that sends SNMP v2c Traps to PRTG.
 
-[VIDEO LINK OR GIF HERE]
+
 
 ---
 
@@ -51,8 +51,6 @@ Reactive monitoring lab: a simulated UPS sends SNMP Traps to **PRTG**, which rea
 
 ## The three scenarios
 
-| Scenario | Trap message | Sensor | PRTG actions | Result on the server |
-|---|---|---|---|---|
 | **Mains lost** (on battery) | `ALERT :On Battery - Mains Power lost` | 🟡 Warning | E-mail + `01_mains_lost.bat` | `wall` message to logged-in users |
 | **Low battery** | `Low Battery - ERROR` | 🔴 Error | E-mail + `02_low_battery_shutdown.bat` | Containers stopped, `shutdown -h +2`, `wall` message |
 | **Mains restored** | `Normal - Mains restored` | 🟢 OK | `03_mains_restored.bat` | `shutdown -c` cancels shutdown, `wall` info message |
@@ -60,35 +58,12 @@ Reactive monitoring lab: a simulated UPS sends SNMP Traps to **PRTG**, which rea
 ### Event chain (low battery)
 
 1. The Linux VM sends an SNMP Trap to PRTG (UDP 162).
-2. PRTG's SNMP Trap Receiver sensor captures it and evaluates it against its filters. [TO COMPLETE: describe your filter on the message text and the channel limits that produce yellow / red / green]
+2. PRTG's SNMP Trap Receiver sensor captures it and evaluates it against its filters. i configured certain bindings to filter the traps messages like "On Battery" "Mains Restored" .
 3. The sensor changes state, which fires the matching notification trigger.
 4. PRTG sends an e-mail and runs a `.bat` file that calls `ssh.exe`.
 5. On the server, a forced-command script stops the containers, broadcasts a message, and runs `shutdown -h +2`.
 
----
 
-## Repository structure
-
-```
-prtg-ups-auto-shutdown/
-├── README.md
-├── prtg-scripts/            # run by PRTG on Windows
-│   ├── 01_mains_lost.bat
-│   ├── 02_low_battery_shutdown.bat
-│   └── 03_mains_restored.bat
-├── server/                  # lives on the Ubuntu target
-│   ├── ups-action.sh
-│   ├── sudoers_prtgups.example
-│   └── authorized_keys.example
-├── simulation/
-│   └── send_traps.sh
-├── docs/
-│   ├── ufw_status.txt
-│   └── prtg_settings.md
-└── images/
-```
-
----
 
 ## Security design
 
@@ -152,53 +127,51 @@ The other two are identical with `mains_lost` and `mains_restored` as the action
 ## Setup
 
 ### 1. Target server (Ubuntu)
-
-```bash
+(copy ups-action.sh to the server first)
+#1. Create the dedicated user (key authentication only)
 sudo adduser --disabled-password --gecos "" prtgups
+
+# 2. Install the forced-command wrapper (root-owned, not writable by prtgups)
 sudo cp server/ups-action.sh /usr/local/bin/ups-action.sh
 sudo chown root:root /usr/local/bin/ups-action.sh
 sudo chmod 755 /usr/local/bin/ups-action.sh
 
-sudo visudo -f /etc/sudoers.d/prtgups      # paste the sudoers line
-sudo visudo -c                              # must say: parsed OK
-sudo -l -U prtgups                          # check allowed commands
+# 3. Restrict sudo to the exact commands needed
+sudo visudo -f /etc/sudoers.d/prtgups     # paste the line from server/sudoers_prtgups.example
+sudo visudo -c                             # must say: parsed OK
+sudo -l -U prtgups                         # must list only the 4 allowed commands
 
+# 4. Install the restricted public key
 sudo mkdir -p /home/prtgups/.ssh
-# put the public key in authorized_keys with the command=...,restrict prefix
+echo 'command="/usr/local/bin/ups-action.sh",restrict ssh-rsa AAAA...YOUR-PUBLIC-KEY... prtg' | sudo tee /home/prtgups/.ssh/authorized_keys
 sudo chown -R prtgups:prtgups /home/prtgups/.ssh
 sudo chmod 700 /home/prtgups/.ssh
 sudo chmod 600 /home/prtgups/.ssh/authorized_keys
-```
+(Generate the keypair on the PRTG server with ssh-keygen -t ed25519)
 
 ### 2. PRTG server (Windows)
 
-- Place the private key in `C:\PRTGKey\` (**never commit it**).
+- Place the private key in `C:\PRTGKey\`.
 - Open **UDP 162** in the Windows firewall for the Trap receiver.
-- Create the SNMP Trap Receiver sensor and its filters. [TO COMPLETE]
-- Create three notification templates (execute program: the `.bat` files; e-mail via Gmail SMTP with an app password).
-- Create state triggers: Warning -> mail + script 01, Down -> mail + script 02, Up -> script 03. [TO COMPLETE: confirm your exact triggers]
+- Create the SNMP Trap Receiver sensor and its filters. <img width="281" height="290" alt="image" src="https://github.com/user-attachments/assets/96611aa3-c877-4078-9145-2ca768239411" />, 
+
+- Create three notification templates, i honestly used claude for templates for the 3 states i implemented.
+- Create state triggers: Warning -> mail + script 01, Down -> mail + script 02, Up -> script 03. 
+<img width="757" height="791" alt="image" src="https://github.com/user-attachments/assets/0428b700-16db-475c-a720-d6a785ec2ac0" />
 
 ### 3. Simulation (Linux VM)
 
-```bash
-./simulation/send_traps.sh onbattery    # sensor -> yellow
-./simulation/send_traps.sh lowbattery   # sensor -> red
-./simulation/send_traps.sh restored     # sensor -> green
-```
+The UPS is simulated by sending SNMP v2c Traps from the Linux VM to PRTG (192.168.56.1):
 
----
+# Mains lost -> sensor turns yellow
+snmptrap -v2c -c public_next 192.168.56.1 '' 1.3.6.1.2.1.33.2 1.3.6.1.2.1.33.1.2.1.0 s "ALERT :On Battery - Mains Power lost"
 
-## Tests
+# Low battery -> sensor turns red
+snmptrap -v2c -c public_next 192.168.56.1 '' 1.3.6.1.2.1.33.2 1.3.6.1.2.1.33.1.2.1.0 s "Low Battery - ERROR"
 
-| Test | Command (from the PRTG server) | Expected |
-|---|---|---|
-| Allowed action | `ssh.exe -i C:\PRTGKey\ssh.txt prtgups@192.168.56.10 mains_lost` | `wall` message appears |
-| Forbidden command | `ssh.exe -i C:\PRTGKey\ssh.txt prtgups@192.168.56.10 "cat /etc/shadow"` | `Denied` |
-| Full scenario | Send the 3 traps in sequence | Yellow -> red + shutdown scheduled -> green + shutdown cancelled |
+# Mains restored -> sensor turns green
+snmptrap -v2c -c public_next 192.168.56.1 '' 1.3.6.1.2.1.33.2 1.3.6.1.2.1.33.1.2.1.0 s "Normal - Mains restored"
 
-[ADD SCREENSHOT OF THE "Denied" TEST HERE]
-
----
 
 ## Firewall (ufw)
 
@@ -212,7 +185,7 @@ See `docs/ufw_status.txt`. Default policy: deny incoming, allow outgoing. Open: 
 - The SSH keypair was generated on the Linux VM. Better practice: generate it on the PRTG server (`ssh-keygen -t ed25519`) so the private key exists in one place only.
 - `mains_restored` cancels the shutdown but does **not** restart the stopped containers. Next step: add `docker start` for the three containers (and the matching sudoers entry).
 - The community string `public_next` is a lab value.
-- Next steps: Teams notifications, compare with **NUT / apcupsd** (the standard tools for real UPS shutdown), test with a real UPS.
+- Next steps: Teams notifications, compare with **NUT / apcupsd** (the standard tools for real UPS shutdown) and eventually test with a real UPS.
 
 ## Skills practised
 
@@ -220,4 +193,4 @@ SNMP (Traps, OIDs, polling) · PRTG sensors, notifications and triggers · Linux
 
 ## Author
 
-[YOUR NAME], networks and telecommunications engineering student · [LinkedIn URL]
+Omar El Ghazi, networks and telecommunications engineering student · [https://www.linkedin.com/in/mohamed-omar-el-ghazi-362b3521b/?isSelfProfile=true]
