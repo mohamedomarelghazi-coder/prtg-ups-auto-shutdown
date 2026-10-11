@@ -1,1 +1,2 @@
-
+@echo off
+"C:\Windows\System32\OpenSSH\ssh.exe" -i "C:\PRTGKey\ssh.txt" -o StrictHostKeyChecking=no -o UserKnownHostsFile=NUL -o BatchMode=yes adminnet@192.168.56.10 "sudo docker stop app_rh db_finance cache_it && sudo /sbin/shutdown -h +2 'ALERTE BATTERIE FAIBLE : Arret automatique des conteneurs (app_rh, db_finance, cache_it). Extinction du systeme dans 2 minutes.'" >> C:\PRTGKey\prtg_debug.log 2>&1
