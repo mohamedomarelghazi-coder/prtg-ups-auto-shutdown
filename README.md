@@ -1,1 +1,0 @@
-# prtg-ups-auto-shutdown
